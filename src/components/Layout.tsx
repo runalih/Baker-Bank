@@ -13,7 +13,7 @@ export default function Layout() {
     <div className="flex min-h-screen bg-paper text-ink">
       <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-paper-2 px-4 py-6">
         <h1 className="mb-8 px-1 font-display text-xl font-semibold text-ink">
-          Baker&apos;s Costing
+          BakerBank
         </h1>
         <nav className="flex flex-col gap-1">
           <NavLink to="/materials" className={navLinkClass}>

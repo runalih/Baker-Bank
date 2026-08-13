@@ -46,7 +46,7 @@ export default function AuthPage() {
     <div className="flex min-h-screen items-center justify-center bg-paper px-4">
       <div className="w-full max-w-sm">
         <h1 className="mb-1 text-center font-display text-2xl font-semibold text-ink">
-          Baker&apos;s Costing
+          BakerBank
         </h1>
         <p className="mb-6 text-center text-sm text-ink-2">
           {mode === 'signIn' ? 'Sign in to your account' : 'Create an account'}
