@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { createMaterial, getMaterial, listMaterials, updateMaterial } from '../../lib/storage';
@@ -6,17 +6,60 @@ import { materialBaseUnitLabel, materialCostPerBaseUnit } from '../../lib/costin
 import { unitById } from '../../lib/units';
 import { findDensityMatch } from '../../data/densities';
 import UnitSelect from '../../components/UnitSelect';
+import type { Material } from '../../lib/types';
 
 export default function MaterialFormPage() {
   const { id } = useParams();
+  const [existing, setExisting] = useState<Material | null | undefined>(id ? undefined : null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) {
+      setExisting(null);
+      return;
+    }
+    setExisting(undefined);
+    getMaterial(id)
+      .then((m) => setExisting(m ?? null))
+      .catch((err) => setLoadError(err instanceof Error ? err.message : 'Could not load material'));
+  }, [id]);
+
+  if (loadError) {
+    return <p className="text-sm text-clay">{loadError}</p>;
+  }
+
+  if (existing === undefined) {
+    return <p className="text-sm text-ink-2">Loading…</p>;
+  }
+
+  if (id && !existing) {
+    return (
+      <div className="text-sm text-ink-2">
+        Material not found. <Link to="/materials" className="text-teal hover:underline">Back to materials</Link>
+      </div>
+    );
+  }
+
+  return <MaterialForm key={id ?? 'new'} id={id} existing={existing ?? undefined} />;
+}
+
+interface MaterialFormProps {
+  id: string | undefined;
+  existing: Material | undefined;
+}
+
+function MaterialForm({ id, existing }: MaterialFormProps) {
   const navigate = useNavigate();
-  const existing = useMemo(() => (id ? getMaterial(id) : undefined), [id]);
   const isEdit = Boolean(id);
 
-  const ingredientNameOptions = useMemo(
-    () => Array.from(new Set(listMaterials().map((m) => m.ingredientName))).filter(Boolean).sort(),
-    []
-  );
+  const [ingredientNameOptions, setIngredientNameOptions] = useState<string[]>([]);
+  useEffect(() => {
+    listMaterials()
+      .then((materials) =>
+        setIngredientNameOptions(Array.from(new Set(materials.map((m) => m.ingredientName))).filter(Boolean).sort())
+      )
+      .catch(() => setIngredientNameOptions([]));
+  }, []);
 
   const [ingredientName, setIngredientName] = useState(existing?.ingredientName ?? '');
   const [name, setName] = useState(existing?.name ?? '');
@@ -27,14 +70,7 @@ export default function MaterialFormPage() {
   const [densityGPerMl, setDensityGPerMl] = useState(existing?.densityGPerMl?.toString() ?? '');
   const [gramsPerEach, setGramsPerEach] = useState(existing?.gramsPerEach?.toString() ?? '');
   const [error, setError] = useState<string | null>(null);
-
-  if (id && !existing) {
-    return (
-      <div className="text-sm text-ink-2">
-        Material not found. <Link to="/materials" className="text-teal hover:underline">Back to materials</Link>
-      </div>
-    );
-  }
+  const [submitting, setSubmitting] = useState(false);
 
   const packageUnitType = unitById(packageUnitId).type;
   const densityMatch = ingredientName.trim() ? findDensityMatch(ingredientName) : undefined;
@@ -61,7 +97,7 @@ export default function MaterialFormPage() {
     }
   })();
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
@@ -95,12 +131,18 @@ export default function MaterialFormPage() {
       gramsPerEach: gramsPerEach.trim() ? parseFloat(gramsPerEach) : undefined,
     };
 
-    if (isEdit && id) {
-      updateMaterial(id, input);
-    } else {
-      createMaterial(input);
+    setSubmitting(true);
+    try {
+      if (isEdit && id) {
+        await updateMaterial(id, input);
+      } else {
+        await createMaterial(input);
+      }
+      navigate('/materials');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save material');
+      setSubmitting(false);
     }
-    navigate('/materials');
   }
 
   return (
@@ -268,9 +310,10 @@ export default function MaterialFormPage() {
         <div className="flex gap-3">
           <button
             type="submit"
-            className="rounded-md bg-teal px-4 py-2 text-sm font-medium text-paper hover:bg-teal/90"
+            disabled={submitting}
+            className="rounded-md bg-teal px-4 py-2 text-sm font-medium text-paper hover:bg-teal/90 disabled:opacity-60"
           >
-            {isEdit ? 'Save changes' : 'Add material'}
+            {submitting ? 'Saving…' : isEdit ? 'Save changes' : 'Add material'}
           </button>
           <Link
             to="/materials"

@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
 import type { MaterialInput } from '../../lib/storage';
 import { createMaterial, createRecipe, getRecipe, listMaterials, updateRecipe } from '../../lib/storage';
 import { calculateRecipeCost } from '../../lib/costing';
-import type { Material, RecipeIngredientLine } from '../../lib/types';
+import type { Material, Recipe, RecipeIngredientLine } from '../../lib/types';
 import { unitById } from '../../lib/units';
 import UnitSelect from '../../components/UnitSelect';
 import ResolveIngredientsModal from '../../components/ResolveIngredientsModal';
@@ -19,10 +19,54 @@ function baseUnitIdForLineUnit(unitId: string): string {
 
 export default function RecipeBuilderPage() {
   const { id } = useParams();
+  const [existing, setExisting] = useState<Recipe | null | undefined>(id ? undefined : null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) {
+      setExisting(null);
+      return;
+    }
+    setExisting(undefined);
+    getRecipe(id)
+      .then((r) => setExisting(r ?? null))
+      .catch((err) => setLoadError(err instanceof Error ? err.message : 'Could not load recipe'));
+  }, [id]);
+
+  if (loadError) {
+    return <p className="text-sm text-clay">{loadError}</p>;
+  }
+
+  if (existing === undefined) {
+    return <p className="text-sm text-ink-2">Loading…</p>;
+  }
+
+  if (id && !existing) {
+    return (
+      <div className="text-sm text-ink-2">
+        Recipe not found. <Link to="/recipes" className="text-teal hover:underline">Back to recipes</Link>
+      </div>
+    );
+  }
+
+  return <RecipeBuilder key={id ?? 'new'} id={id} existing={existing ?? undefined} />;
+}
+
+interface RecipeBuilderProps {
+  id: string | undefined;
+  existing: Recipe | undefined;
+}
+
+function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
   const navigate = useNavigate();
-  const existing = useMemo(() => (id ? getRecipe(id) : undefined), [id]);
   const isEdit = Boolean(id);
-  const [materials, setMaterials] = useState<Material[]>(() => listMaterials());
+  const [materials, setMaterials] = useState<Material[]>([]);
+
+  useEffect(() => {
+    listMaterials()
+      .then(setMaterials)
+      .catch(() => setMaterials([]));
+  }, []);
 
   const [name, setName] = useState(existing?.name ?? '');
   const [yieldAmount, setYieldAmount] = useState(existing?.yieldAmount.toString() ?? '1');
@@ -32,6 +76,7 @@ export default function RecipeBuilderPage() {
     () => (existing?.ingredients ?? []).map((line) => ({ ...line, ingredientName: line.ingredientName ?? '' }))
   );
   const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [resolveNames, setResolveNames] = useState<string[] | null>(null);
   const [resolveDefaultUnits, setResolveDefaultUnits] = useState<Record<string, string>>({});
 
@@ -39,14 +84,6 @@ export default function RecipeBuilderPage() {
     () => Array.from(new Set(materials.map((m) => m.ingredientName))).filter(Boolean).sort(),
     [materials]
   );
-
-  if (id && !existing) {
-    return (
-      <div className="text-sm text-ink-2">
-        Recipe not found. <Link to="/recipes" className="text-teal hover:underline">Back to recipes</Link>
-      </div>
-    );
-  }
 
   const draftRecipe = {
     id: existing?.id ?? 'draft',
@@ -95,7 +132,7 @@ export default function RecipeBuilderPage() {
     openResolveModalForNames(Array.from(unresolved.values()));
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
@@ -125,29 +162,40 @@ export default function RecipeBuilderPage() {
       ingredients,
     };
 
-    if (isEdit && id) {
-      updateRecipe(id, input);
-    } else {
-      createRecipe(input);
+    setSubmitting(true);
+    try {
+      if (isEdit && id) {
+        await updateRecipe(id, input);
+      } else {
+        await createRecipe(input);
+      }
+      navigate('/recipes');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save recipe');
+      setSubmitting(false);
     }
-    navigate('/recipes');
   }
 
-  function handleResolveConfirm(newMaterials: Record<string, MaterialInput>) {
-    const createdIdByKey = new Map<string, string>();
-    for (const [ingredientName, materialInput] of Object.entries(newMaterials)) {
-      const created = createMaterial(materialInput);
-      createdIdByKey.set(ingredientName.trim().toLowerCase(), created.id);
+  async function handleResolveConfirm(newMaterials: Record<string, MaterialInput>) {
+    try {
+      const createdIdByKey = new Map<string, string>();
+      for (const [ingredientName, materialInput] of Object.entries(newMaterials)) {
+        const created = await createMaterial(materialInput);
+        createdIdByKey.set(ingredientName.trim().toLowerCase(), created.id);
+      }
+      if (createdIdByKey.size > 0) {
+        setMaterials(await listMaterials());
+        setIngredients((prev) =>
+          prev.map((line) =>
+            line.materialId ? line : { ...line, materialId: createdIdByKey.get(line.ingredientName.trim().toLowerCase()) }
+          )
+        );
+      }
+      setResolveNames(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save product');
+      setResolveNames(null);
     }
-    if (createdIdByKey.size > 0) {
-      setMaterials(listMaterials());
-      setIngredients((prev) =>
-        prev.map((line) =>
-          line.materialId ? line : { ...line, materialId: createdIdByKey.get(line.ingredientName.trim().toLowerCase()) }
-        )
-      );
-    }
-    setResolveNames(null);
   }
 
   return (
@@ -385,9 +433,10 @@ export default function RecipeBuilderPage() {
         <div className="flex gap-3">
           <button
             type="submit"
-            className="rounded-md bg-teal px-4 py-2 text-sm font-medium text-paper hover:bg-teal/90"
+            disabled={submitting}
+            className="rounded-md bg-teal px-4 py-2 text-sm font-medium text-paper hover:bg-teal/90 disabled:opacity-60"
           >
-            {isEdit ? 'Save changes' : 'Create recipe'}
+            {submitting ? 'Saving…' : isEdit ? 'Save changes' : 'Create recipe'}
           </button>
           <Link
             to="/recipes"

@@ -1,16 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteMaterial, listMaterials } from '../../lib/storage';
 import { materialBaseUnitLabel, materialCostPerBaseUnit } from '../../lib/costing';
 import { unitById } from '../../lib/units';
+import type { Material } from '../../lib/types';
 
 export default function MaterialsListPage() {
-  const [materials, setMaterials] = useState(() => listMaterials());
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleDelete(id: string, name: string) {
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  function refresh() {
+    setLoading(true);
+    listMaterials()
+      .then(setMaterials)
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load materials'))
+      .finally(() => setLoading(false));
+  }
+
+  async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This can't be undone.`)) return;
-    deleteMaterial(id);
-    setMaterials(listMaterials());
+    try {
+      await deleteMaterial(id);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete material');
+    }
   }
 
   return (
@@ -28,7 +47,11 @@ export default function MaterialsListPage() {
         </Link>
       </div>
 
-      {materials.length === 0 ? (
+      {error && <p className="mb-4 text-sm text-clay">{error}</p>}
+
+      {loading ? (
+        <p className="text-sm text-ink-2">Loading…</p>
+      ) : materials.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line-strong bg-paper-2 px-6 py-12 text-center text-sm text-ink-2">
           No materials yet. Add flour, sugar, butter, or anything else you buy by weight, volume, or
           count.

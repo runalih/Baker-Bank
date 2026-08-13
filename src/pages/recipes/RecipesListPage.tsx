@@ -1,16 +1,38 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteRecipe, listMaterials, listRecipes } from '../../lib/storage';
 import { calculateRecipeCost } from '../../lib/costing';
+import type { Material, Recipe } from '../../lib/types';
 
 export default function RecipesListPage() {
-  const [recipes, setRecipes] = useState(() => listRecipes());
-  const materials = listMaterials();
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleDelete(id: string, name: string) {
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  function refresh() {
+    setLoading(true);
+    Promise.all([listRecipes(), listMaterials()])
+      .then(([r, m]) => {
+        setRecipes(r);
+        setMaterials(m);
+      })
+      .catch((err) => setError(err instanceof Error ? err.message : 'Could not load recipes'))
+      .finally(() => setLoading(false));
+  }
+
+  async function handleDelete(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This can't be undone.`)) return;
-    deleteRecipe(id);
-    setRecipes(listRecipes());
+    try {
+      await deleteRecipe(id);
+      refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete recipe');
+    }
   }
 
   return (
@@ -28,7 +50,11 @@ export default function RecipesListPage() {
         </Link>
       </div>
 
-      {recipes.length === 0 ? (
+      {error && <p className="mb-4 text-sm text-clay">{error}</p>}
+
+      {loading ? (
+        <p className="text-sm text-ink-2">Loading…</p>
+      ) : recipes.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line-strong bg-paper-2 px-6 py-12 text-center text-sm text-ink-2">
           No recipes yet. Build your first one — you can type ingredients freely and add pricing as you go.
         </div>

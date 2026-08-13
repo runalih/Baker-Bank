@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `block rounded-md px-3 py-2 text-sm font-medium transition-colors ${
@@ -6,6 +7,8 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   }`;
 
 export default function Layout() {
+  const { user, signOut } = useAuth();
+
   return (
     <div className="flex min-h-screen bg-paper text-ink">
       <aside className="flex w-56 shrink-0 flex-col border-r border-line bg-paper-2 px-4 py-6">
@@ -20,6 +23,19 @@ export default function Layout() {
             Recipes
           </NavLink>
         </nav>
+
+        <div className="mt-auto border-t border-line pt-4">
+          <p className="mb-2 truncate px-1 text-xs text-ink-2" title={user?.email ?? ''}>
+            {user?.email}
+          </p>
+          <button
+            type="button"
+            onClick={() => signOut()}
+            className="w-full rounded-md border border-line-strong px-3 py-2 text-sm font-medium text-ink-2 hover:bg-paper"
+          >
+            Sign out
+          </button>
+        </div>
       </aside>
       <main className="min-w-0 flex-1 px-8 py-8">
         <Outlet />

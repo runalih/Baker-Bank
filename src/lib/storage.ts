@@ -1,94 +1,154 @@
-import { v4 as uuidv4 } from 'uuid';
+import { supabase } from './supabaseClient';
 import type { Material, Recipe } from './types';
 
-const MATERIALS_KEY = 'baker-costing:materials';
-const RECIPES_KEY = 'baker-costing:recipes';
+export type MaterialInput = Omit<Material, 'id' | 'createdAt' | 'updatedAt'>;
+export type RecipeInput = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>;
 
-function readList<T>(key: string): T[] {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T[]) : [];
-  } catch {
-    return [];
-  }
+interface MaterialRow {
+  id: string;
+  ingredient_name: string;
+  name: string;
+  vendor: string | null;
+  package_amount: number;
+  package_unit_id: string;
+  package_cost: number;
+  density_g_per_ml: number | null;
+  grams_per_each: number | null;
+  created_at: string;
+  updated_at: string;
 }
 
-function writeList<T>(key: string, items: T[]): void {
-  localStorage.setItem(key, JSON.stringify(items));
+interface RecipeRow {
+  id: string;
+  name: string;
+  yield_amount: number;
+  yield_label: string;
+  notes: string | null;
+  ingredients: Recipe['ingredients'];
+  created_at: string;
+  updated_at: string;
+}
+
+function toMaterial(row: MaterialRow): Material {
+  return {
+    id: row.id,
+    ingredientName: row.ingredient_name,
+    name: row.name,
+    vendor: row.vendor ?? undefined,
+    packageAmount: row.package_amount,
+    packageUnitId: row.package_unit_id,
+    packageCost: row.package_cost,
+    densityGPerMl: row.density_g_per_ml ?? undefined,
+    gramsPerEach: row.grams_per_each ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toMaterialRow(input: MaterialInput) {
+  return {
+    ingredient_name: input.ingredientName,
+    name: input.name,
+    vendor: input.vendor ?? null,
+    package_amount: input.packageAmount,
+    package_unit_id: input.packageUnitId,
+    package_cost: input.packageCost,
+    density_g_per_ml: input.densityGPerMl ?? null,
+    grams_per_each: input.gramsPerEach ?? null,
+  };
+}
+
+function toRecipe(row: RecipeRow): Recipe {
+  return {
+    id: row.id,
+    name: row.name,
+    yieldAmount: row.yield_amount,
+    yieldLabel: row.yield_label,
+    notes: row.notes ?? undefined,
+    ingredients: row.ingredients ?? [],
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toRecipeRow(input: RecipeInput) {
+  return {
+    name: input.name,
+    yield_amount: input.yieldAmount,
+    yield_label: input.yieldLabel,
+    notes: input.notes ?? null,
+    ingredients: input.ingredients,
+  };
 }
 
 // Materials
 
-export type MaterialInput = Omit<Material, 'id' | 'createdAt' | 'updatedAt'>;
-
-export function listMaterials(): Material[] {
-  return readList<Material>(MATERIALS_KEY).sort((a, b) => a.name.localeCompare(b.name));
+export async function listMaterials(): Promise<Material[]> {
+  const { data, error } = await supabase.from('materials').select('*').order('name');
+  if (error) throw error;
+  return (data as MaterialRow[]).map(toMaterial);
 }
 
-export function getMaterial(id: string): Material | undefined {
-  return readList<Material>(MATERIALS_KEY).find((m) => m.id === id);
+export async function getMaterial(id: string): Promise<Material | undefined> {
+  const { data, error } = await supabase.from('materials').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data ? toMaterial(data as MaterialRow) : undefined;
 }
 
-export function createMaterial(input: MaterialInput): Material {
-  const now = new Date().toISOString();
-  const material: Material = { ...input, id: uuidv4(), createdAt: now, updatedAt: now };
-  const materials = readList<Material>(MATERIALS_KEY);
-  materials.push(material);
-  writeList(MATERIALS_KEY, materials);
-  return material;
+export async function createMaterial(input: MaterialInput): Promise<Material> {
+  const { data, error } = await supabase.from('materials').insert(toMaterialRow(input)).select().single();
+  if (error) throw error;
+  return toMaterial(data as MaterialRow);
 }
 
-export function updateMaterial(id: string, input: MaterialInput): Material {
-  const materials = readList<Material>(MATERIALS_KEY);
-  const index = materials.findIndex((m) => m.id === id);
-  if (index === -1) throw new Error(`Material not found: ${id}`);
-  const updated: Material = { ...input, id, createdAt: materials[index].createdAt, updatedAt: new Date().toISOString() };
-  materials[index] = updated;
-  writeList(MATERIALS_KEY, materials);
-  return updated;
+export async function updateMaterial(id: string, input: MaterialInput): Promise<Material> {
+  const { data, error } = await supabase
+    .from('materials')
+    .update({ ...toMaterialRow(input), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return toMaterial(data as MaterialRow);
 }
 
-export function deleteMaterial(id: string): void {
-  writeList(
-    MATERIALS_KEY,
-    readList<Material>(MATERIALS_KEY).filter((m) => m.id !== id)
-  );
+export async function deleteMaterial(id: string): Promise<void> {
+  const { error } = await supabase.from('materials').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // Recipes
 
-export type RecipeInput = Omit<Recipe, 'id' | 'createdAt' | 'updatedAt'>;
-
-export function listRecipes(): Recipe[] {
-  return readList<Recipe>(RECIPES_KEY).sort((a, b) => a.name.localeCompare(b.name));
+export async function listRecipes(): Promise<Recipe[]> {
+  const { data, error } = await supabase.from('recipes').select('*').order('name');
+  if (error) throw error;
+  return (data as RecipeRow[]).map(toRecipe);
 }
 
-export function getRecipe(id: string): Recipe | undefined {
-  return readList<Recipe>(RECIPES_KEY).find((r) => r.id === id);
+export async function getRecipe(id: string): Promise<Recipe | undefined> {
+  const { data, error } = await supabase.from('recipes').select('*').eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data ? toRecipe(data as RecipeRow) : undefined;
 }
 
-export function createRecipe(input: RecipeInput): Recipe {
-  const now = new Date().toISOString();
-  const recipe: Recipe = { ...input, id: uuidv4(), createdAt: now, updatedAt: now };
-  const recipes = readList<Recipe>(RECIPES_KEY);
-  recipes.push(recipe);
-  writeList(RECIPES_KEY, recipes);
-  return recipe;
+export async function createRecipe(input: RecipeInput): Promise<Recipe> {
+  const { data, error } = await supabase.from('recipes').insert(toRecipeRow(input)).select().single();
+  if (error) throw error;
+  return toRecipe(data as RecipeRow);
 }
 
-export function updateRecipe(id: string, input: RecipeInput): Recipe {
-  const recipes = readList<Recipe>(RECIPES_KEY);
-  const index = recipes.findIndex((r) => r.id === id);
-  if (index === -1) throw new Error(`Recipe not found: ${id}`);
-  const updated: Recipe = { ...input, id, createdAt: recipes[index].createdAt, updatedAt: new Date().toISOString() };
-  recipes[index] = updated;
-  writeList(RECIPES_KEY, recipes);
-  return updated;
+export async function updateRecipe(id: string, input: RecipeInput): Promise<Recipe> {
+  const { data, error } = await supabase
+    .from('recipes')
+    .update({ ...toRecipeRow(input), updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return toRecipe(data as RecipeRow);
 }
 
-export function deleteRecipe(id: string): void {
-  writeList(
-    RECIPES_KEY,
-    readList<Recipe>(RECIPES_KEY).filter((r) => r.id !== id)
-  );
+export async function deleteRecipe(id: string): Promise<void> {
+  const { error } = await supabase.from('recipes').delete().eq('id', id);
+  if (error) throw error;
 }
