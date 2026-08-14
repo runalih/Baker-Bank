@@ -109,7 +109,7 @@ export default function ResolveIngredientsModal({
                 <div key={ingredientName} className="rounded-lg border border-line-strong p-4">
                   <h4 className="mb-3 font-display text-base font-semibold text-ink">{ingredientName}</h4>
                   <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-xs font-medium text-ink">Specific product</label>
                         <input
@@ -134,7 +134,7 @@ export default function ResolveIngredientsModal({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-xs font-medium text-ink">Package amount</label>
                         <input
@@ -170,7 +170,7 @@ export default function ResolveIngredientsModal({
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <label className="mb-1 block text-xs font-medium text-ink">
                           Density (g/mL) <span className="text-ink-2">(optional)</span>

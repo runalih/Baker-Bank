@@ -43,14 +43,14 @@ export default function MaterialsListPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-2xl font-semibold text-ink">Materials</h2>
           <p className="mt-1 text-sm text-ink-2">Ingredients and supplies, priced per package.</p>
         </div>
         <Link
           to="/materials/new"
-          className="rounded-md bg-teal px-4 py-2 text-sm font-medium text-paper hover:bg-teal/90"
+          className="rounded-md bg-teal px-4 py-2 text-center text-sm font-medium text-paper hover:bg-teal/90"
         >
           Add material
         </Link>
@@ -82,8 +82,8 @@ export default function MaterialsListPage() {
           No materials match "{search}".
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-line">
-          <table className="w-full border-collapse text-sm">
+        <div className="overflow-x-auto rounded-lg border border-line">
+          <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr className="border-b border-line bg-paper-2 text-left text-xs uppercase tracking-wide text-ink-2">
                 <th className="px-4 py-3 font-medium">Ingredient</th>

@@ -46,14 +46,14 @@ export default function RecipesListPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="font-display text-2xl font-semibold text-ink">Recipes</h2>
           <p className="mt-1 text-sm text-ink-2">Build recipes from your materials and see live costs.</p>
         </div>
         <Link
           to="/recipes/new"
-          className="rounded-md bg-teal px-4 py-2 text-sm font-medium text-paper hover:bg-teal/90"
+          className="rounded-md bg-teal px-4 py-2 text-center text-sm font-medium text-paper hover:bg-teal/90"
         >
           New recipe
         </Link>
@@ -90,7 +90,7 @@ export default function RecipesListPage() {
             return (
               <div
                 key={r.id}
-                className="flex items-center justify-between rounded-lg border border-line bg-paper px-5 py-4"
+                className="flex flex-col gap-4 rounded-lg border border-line bg-paper px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
                   <h3 className="font-display text-lg font-semibold text-ink">{r.name}</h3>
@@ -99,7 +99,7 @@ export default function RecipesListPage() {
                     {r.ingredients.length === 1 ? '' : 's'}
                   </p>
                 </div>
-                <div className="flex items-center gap-6">
+                <div className="flex items-center justify-between gap-6 sm:justify-end">
                   <div className="text-right">
                     <div className="font-mono text-lg font-semibold text-ink">
                       ${summary.totalCost.toFixed(2)}

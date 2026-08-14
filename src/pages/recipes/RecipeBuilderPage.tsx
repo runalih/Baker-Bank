@@ -230,8 +230,8 @@ function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
       </div>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-6">
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-3 sm:col-span-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="sm:col-span-1">
             <label htmlFor="name" className="mb-1 block text-sm font-medium text-ink">
               Recipe name
             </label>
@@ -409,7 +409,7 @@ function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
           </button>
 
           {unresolvedCount > 0 && (
-            <div className="mt-2 flex items-center justify-between rounded-md bg-paper-2 px-3 py-2 text-xs text-ink-2">
+            <div className="mt-2 flex flex-col gap-2 rounded-md bg-paper-2 px-3 py-2 text-xs text-ink-2 sm:flex-row sm:items-center sm:justify-between">
               <span>
                 {unresolvedCount} ingredient{unresolvedCount === 1 ? '' : 's'} without a priced product yet — the
                 recipe will save fine, but won&apos;t be fully costed until you add one.
@@ -417,7 +417,7 @@ function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
               <button
                 type="button"
                 onClick={openResolveModalForAllUnresolved}
-                className="ml-3 shrink-0 font-medium text-teal hover:underline"
+                className="shrink-0 self-start font-medium text-teal hover:underline sm:ml-3 sm:self-auto"
               >
                 Add pricing
               </button>
