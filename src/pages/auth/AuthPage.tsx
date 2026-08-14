@@ -24,8 +24,18 @@ export default function AuthPage() {
     setInfo(null);
     setSubmitting(true);
 
-    const result = mode === 'signIn' ? await signIn(email, password) : await signUp(email, password);
+    if (mode === 'signIn') {
+      const result = await signIn(email, password);
+      setSubmitting(false);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      navigate('/materials');
+      return;
+    }
 
+    const result = await signUp(email, password);
     setSubmitting(false);
 
     if (result.error) {
@@ -33,13 +43,12 @@ export default function AuthPage() {
       return;
     }
 
-    if (mode === 'signUp') {
+    if (result.needsConfirmation) {
       setInfo('Check your email to confirm your account, then sign in.');
       setMode('signIn');
-      return;
+    } else {
+      navigate('/materials');
     }
-
-    navigate('/materials');
   }
 
   return (
