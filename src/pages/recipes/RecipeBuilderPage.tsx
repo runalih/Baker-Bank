@@ -287,16 +287,7 @@ function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
         </div>
 
         <div>
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-ink">Ingredients</h3>
-            <button
-              type="button"
-              onClick={addIngredient}
-              className="rounded-md border border-line-strong px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-paper-2"
-            >
-              Add ingredient
-            </button>
-          </div>
+          <h3 className="mb-2 text-sm font-medium text-ink">Ingredients</h3>
 
           <datalist id="ingredient-name-options">
             {ingredientNameOptions.map((n) => (
@@ -408,6 +399,14 @@ function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
               </table>
             </div>
           )}
+
+          <button
+            type="button"
+            onClick={addIngredient}
+            className="mt-2 rounded-md border border-line-strong px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-paper-2"
+          >
+            Add ingredient
+          </button>
 
           {unresolvedCount > 0 && (
             <div className="mt-2 flex items-center justify-between rounded-md bg-paper-2 px-3 py-2 text-xs text-ink-2">
