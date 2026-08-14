@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteMaterial, listMaterials } from '../../lib/storage';
 import { materialBaseUnitLabel, materialCostPerBaseUnit } from '../../lib/costing';
@@ -9,6 +9,15 @@ export default function MaterialsListPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filteredMaterials = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return materials;
+    return materials.filter((m) =>
+      [m.ingredientName, m.name, m.vendor].some((field) => field?.toLowerCase().includes(query))
+    );
+  }, [materials, search]);
 
   useEffect(() => {
     refresh();
@@ -49,12 +58,28 @@ export default function MaterialsListPage() {
 
       {error && <p className="mb-4 text-sm text-clay">{error}</p>}
 
+      {!loading && materials.length > 0 && (
+        <div className="mb-4">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by ingredient, product, or vendor…"
+            className="w-full max-w-sm rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-saffron-deep"
+          />
+        </div>
+      )}
+
       {loading ? (
         <p className="text-sm text-ink-2">Loading…</p>
       ) : materials.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line-strong bg-paper-2 px-6 py-12 text-center text-sm text-ink-2">
           No materials yet. Add flour, sugar, butter, or anything else you buy by weight, volume, or
           count.
+        </div>
+      ) : filteredMaterials.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-line-strong bg-paper-2 px-6 py-12 text-center text-sm text-ink-2">
+          No materials match "{search}".
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-line">
@@ -70,7 +95,7 @@ export default function MaterialsListPage() {
               </tr>
             </thead>
             <tbody>
-              {materials.map((m) => {
+              {filteredMaterials.map((m) => {
                 const packageUnit = unitById(m.packageUnitId);
                 let unitCostLabel = '—';
                 try {

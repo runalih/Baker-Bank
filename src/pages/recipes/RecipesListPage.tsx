@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { deleteRecipe, listMaterials, listRecipes } from '../../lib/storage';
 import { calculateRecipeCost } from '../../lib/costing';
@@ -9,6 +9,15 @@ export default function RecipesListPage() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+
+  const filteredRecipes = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return recipes;
+    return recipes.filter((r) =>
+      [r.name, r.yieldLabel, r.notes].some((field) => field?.toLowerCase().includes(query))
+    );
+  }, [recipes, search]);
 
   useEffect(() => {
     refresh();
@@ -52,15 +61,31 @@ export default function RecipesListPage() {
 
       {error && <p className="mb-4 text-sm text-clay">{error}</p>}
 
+      {!loading && recipes.length > 0 && (
+        <div className="mb-4">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, yield, or notes…"
+            className="w-full max-w-sm rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-saffron-deep"
+          />
+        </div>
+      )}
+
       {loading ? (
         <p className="text-sm text-ink-2">Loading…</p>
       ) : recipes.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line-strong bg-paper-2 px-6 py-12 text-center text-sm text-ink-2">
           No recipes yet. Build your first one — you can type ingredients freely and add pricing as you go.
         </div>
+      ) : filteredRecipes.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-line-strong bg-paper-2 px-6 py-12 text-center text-sm text-ink-2">
+          No recipes match "{search}".
+        </div>
       ) : (
         <div className="grid gap-3">
-          {recipes.map((r) => {
+          {filteredRecipes.map((r) => {
             const summary = calculateRecipeCost(r, materials);
             return (
               <div
