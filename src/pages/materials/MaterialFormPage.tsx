@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { createMaterial, getMaterial, listMaterials, updateMaterial } from '../../lib/storage';
+import type { MaterialInput } from '../../lib/storage';
 import { materialBaseUnitLabel, materialCostPerBaseUnit } from '../../lib/costing';
 import { unitById } from '../../lib/units';
 import { findDensityMatch } from '../../data/densities';
 import UnitSelect from '../../components/UnitSelect';
+import { useAutosave } from '../../lib/useAutosave';
 import type { Material } from '../../lib/types';
 
 export default function MaterialFormPage() {
@@ -50,7 +52,8 @@ interface MaterialFormProps {
 
 function MaterialForm({ id, existing }: MaterialFormProps) {
   const navigate = useNavigate();
-  const isEdit = Boolean(id);
+  const [recordId, setRecordId] = useState<string | undefined>(id);
+  const isEdit = Boolean(recordId);
 
   const [ingredientNameOptions, setIngredientNameOptions] = useState<string[]>([]);
   useEffect(() => {
@@ -97,30 +100,11 @@ function MaterialForm({ id, existing }: MaterialFormProps) {
     }
   })();
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-
+  function buildInput(): MaterialInput | null {
     const amount = parseFloat(packageAmount);
     const cost = parseFloat(packageCost);
-    if (!ingredientName.trim()) {
-      setError('Ingredient is required (e.g. "All-purpose flour").');
-      return;
-    }
-    if (!name.trim()) {
-      setError('Specific product name is required.');
-      return;
-    }
-    if (!(amount > 0)) {
-      setError('Package amount must be greater than 0.');
-      return;
-    }
-    if (!(cost >= 0)) {
-      setError('Package cost must be 0 or more.');
-      return;
-    }
-
-    const input = {
+    if (!ingredientName.trim() || !name.trim() || !(amount > 0) || !(cost >= 0)) return null;
+    return {
       ingredientName: ingredientName.trim(),
       name: name.trim(),
       vendor: vendor.trim() || undefined,
@@ -130,14 +114,48 @@ function MaterialForm({ id, existing }: MaterialFormProps) {
       densityGPerMl: densityGPerMl.trim() ? parseFloat(densityGPerMl) : undefined,
       gramsPerEach: gramsPerEach.trim() ? parseFloat(gramsPerEach) : undefined,
     };
+  }
+
+  async function persist(input: MaterialInput) {
+    if (recordId) {
+      await updateMaterial(recordId, input);
+    } else {
+      const created = await createMaterial(input);
+      setRecordId(created.id);
+      window.history.replaceState(null, '', `/materials/${created.id}`);
+    }
+  }
+
+  const autosaveInput = buildInput();
+  const { status: saveStatus, error: saveError, flush } = useAutosave(autosaveInput, {
+    enabled: autosaveInput != null,
+    onSave: (input) => persist(input!),
+  });
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!ingredientName.trim()) {
+      setError('Ingredient is required (e.g. "All-purpose flour").');
+      return;
+    }
+    if (!name.trim()) {
+      setError('Specific product name is required.');
+      return;
+    }
+    if (!(parseFloat(packageAmount) > 0)) {
+      setError('Package amount must be greater than 0.');
+      return;
+    }
+    if (!(parseFloat(packageCost) >= 0)) {
+      setError('Package cost must be 0 or more.');
+      return;
+    }
 
     setSubmitting(true);
     try {
-      if (isEdit && id) {
-        await updateMaterial(id, input);
-      } else {
-        await createMaterial(input);
-      }
+      await flush();
       navigate('/materials');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save material');
@@ -147,9 +165,16 @@ function MaterialForm({ id, existing }: MaterialFormProps) {
 
   return (
     <div className="max-w-xl">
-      <h2 className="font-display text-2xl font-semibold text-ink">
-        {isEdit ? 'Edit material' : 'Add material'}
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-2xl font-semibold text-ink">
+          {isEdit ? 'Edit material' : 'Add material'}
+        </h2>
+        <span className="text-xs text-ink-2">
+          {saveStatus === 'saving' && 'Saving…'}
+          {saveStatus === 'saved' && 'Saved'}
+          {saveStatus === 'error' && <span className="text-clay">Not saved: {saveError}</span>}
+        </span>
+      </div>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
         <div>

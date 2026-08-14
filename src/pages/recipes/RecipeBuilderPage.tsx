@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { v4 as uuidv4 } from 'uuid';
-import type { MaterialInput } from '../../lib/storage';
+import type { MaterialInput, RecipeInput } from '../../lib/storage';
 import { createMaterial, createRecipe, getRecipe, listMaterials, updateRecipe } from '../../lib/storage';
 import { calculateRecipeCost } from '../../lib/costing';
 import type { Material, Recipe, RecipeIngredientLine } from '../../lib/types';
 import { unitById } from '../../lib/units';
 import UnitSelect from '../../components/UnitSelect';
 import ResolveIngredientsModal from '../../components/ResolveIngredientsModal';
+import { useAutosave } from '../../lib/useAutosave';
 
 function baseUnitIdForLineUnit(unitId: string): string {
   const type = unitById(unitId).type;
@@ -59,7 +60,8 @@ interface RecipeBuilderProps {
 
 function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
   const navigate = useNavigate();
-  const isEdit = Boolean(id);
+  const [recordId, setRecordId] = useState<string | undefined>(id);
+  const isEdit = Boolean(recordId);
   const [materials, setMaterials] = useState<Material[]>([]);
 
   useEffect(() => {
@@ -132,16 +134,44 @@ function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
     openResolveModalForNames(Array.from(unresolved.values()));
   }
 
+  function buildInput(): RecipeInput | null {
+    const yieldNum = parseFloat(yieldAmount);
+    if (!name.trim() || !(yieldNum > 0) || !yieldLabel.trim()) return null;
+    if (ingredients.some((line) => !line.ingredientName.trim())) return null;
+    return {
+      name: name.trim(),
+      yieldAmount: yieldNum,
+      yieldLabel: yieldLabel.trim(),
+      notes: notes.trim() || undefined,
+      ingredients,
+    };
+  }
+
+  async function persist(input: RecipeInput) {
+    if (recordId) {
+      await updateRecipe(recordId, input);
+    } else {
+      const created = await createRecipe(input);
+      setRecordId(created.id);
+      window.history.replaceState(null, '', `/recipes/${created.id}`);
+    }
+  }
+
+  const autosaveInput = buildInput();
+  const { status: saveStatus, error: saveError, flush } = useAutosave(autosaveInput, {
+    enabled: autosaveInput != null,
+    onSave: (input) => persist(input!),
+  });
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
 
-    const yieldNum = parseFloat(yieldAmount);
     if (!name.trim()) {
       setError('Name is required.');
       return;
     }
-    if (!(yieldNum > 0)) {
+    if (!(parseFloat(yieldAmount) > 0)) {
       setError('Yield amount must be greater than 0.');
       return;
     }
@@ -154,21 +184,9 @@ function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
       return;
     }
 
-    const input = {
-      name: name.trim(),
-      yieldAmount: yieldNum,
-      yieldLabel: yieldLabel.trim(),
-      notes: notes.trim() || undefined,
-      ingredients,
-    };
-
     setSubmitting(true);
     try {
-      if (isEdit && id) {
-        await updateRecipe(id, input);
-      } else {
-        await createRecipe(input);
-      }
+      await flush();
       navigate('/recipes');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save recipe');
@@ -200,9 +218,16 @@ function RecipeBuilder({ id, existing }: RecipeBuilderProps) {
 
   return (
     <div className="max-w-5xl">
-      <h2 className="font-display text-2xl font-semibold text-ink">
-        {isEdit ? 'Edit recipe' : 'New recipe'}
-      </h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-2xl font-semibold text-ink">
+          {isEdit ? 'Edit recipe' : 'New recipe'}
+        </h2>
+        <span className="text-xs text-ink-2">
+          {saveStatus === 'saving' && 'Saving…'}
+          {saveStatus === 'saved' && 'Saved'}
+          {saveStatus === 'error' && <span className="text-clay">Not saved: {saveError}</span>}
+        </span>
+      </div>
 
       <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-6">
         <div className="grid grid-cols-3 gap-4">
